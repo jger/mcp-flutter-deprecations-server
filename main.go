@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -21,6 +22,7 @@ type FlutterRelease struct {
 	TagName     string `json:"tag_name"`
 	PublishedAt string `json:"published_at"`
 	Body        string `json:"body"`
+	Prerelease  bool   `json:"prerelease"`
 }
 
 type Deprecation struct {
@@ -38,6 +40,17 @@ type DeprecationCache struct {
 
 type CheckCodeArgs struct {
 	Code string `json:"code"`
+}
+
+type FlutterVersionInfo struct {
+	LatestVersion    string `json:"latest_version"`
+	FVMInstalled     bool   `json:"fvm_installed"`
+	FVMVersionExists bool   `json:"fvm_version_exists"`
+	DockerImages     struct {
+		Instrumentisto bool `json:"instrumentisto"`
+		Cirrusci       bool `json:"cirrusci"`
+	} `json:"docker_images"`
+	Details string `json:"details"`
 }
 
 type NoArguments struct{}
@@ -131,7 +144,8 @@ func saveCache(cache *DeprecationCache) error {
 }
 
 func fetchFlutterReleases() ([]FlutterRelease, error) {
-	resp, err := http.Get(FLUTTER_API_URL + "?per_page=50")
+	// Get more releases to ensure we find stable ones
+	resp, err := http.Get(FLUTTER_API_URL + "?per_page=100")
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +158,23 @@ func fetchFlutterReleases() ([]FlutterRelease, error) {
 
 	var releases []FlutterRelease
 	err = json.Unmarshal(body, &releases)
-	return releases, err
+	if err != nil {
+		return nil, err
+	}
+
+	// GitHub returns releases sorted by creation date, but we want by tag version
+	// Filter and sort stable releases properly
+	sort.Slice(releases, func(i, j int) bool {
+		// Sort by published date, newest first
+		timeI, errI := time.Parse(time.RFC3339, releases[i].PublishedAt)
+		timeJ, errJ := time.Parse(time.RFC3339, releases[j].PublishedAt)
+		if errI != nil || errJ != nil {
+			return false
+		}
+		return timeI.After(timeJ)
+	})
+
+	return releases, nil
 }
 
 func parseVersionFromRelease(release FlutterRelease) string {
@@ -263,6 +293,175 @@ func checkCodeForDeprecations(code string) []Deprecation {
 	return foundDeprecations
 }
 
+func getLatestFlutterVersion() (string, error) {
+	releases, err := fetchFlutterReleases()
+	if err != nil {
+		return "", err
+	}
+
+	// First try to find a stable release
+	for _, release := range releases {
+		tagLower := strings.ToLower(release.TagName)
+		version := parseVersionFromRelease(release)
+		
+		// Check if this is a stable release
+		isStable := !release.Prerelease &&
+			!strings.Contains(tagLower, "beta") && 
+			!strings.Contains(tagLower, "dev") && 
+			!strings.Contains(tagLower, "pre") &&
+			!strings.Contains(tagLower, "rc") &&
+			!strings.Contains(tagLower, "alpha") &&
+			!strings.Contains(tagLower, "hotfix") &&
+			// Check for version patterns like "3.19.0-0.1.pre"
+			!strings.Contains(version, "-") &&
+			// Stable versions should match pattern like "3.32.0"
+			regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(version)
+			
+		if isStable {
+			return version, nil
+		}
+	}
+	
+	// If no stable release found, return the latest release regardless
+	if len(releases) > 0 {
+		return parseVersionFromRelease(releases[0]), nil
+	}
+	
+	return "", fmt.Errorf("no releases found")
+}
+
+func checkFVMInstalled() bool {
+	cmd := exec.Command("fvm", "--version")
+	return cmd.Run() == nil
+}
+
+func checkFVMVersionExists(version string) bool {
+	if !checkFVMInstalled() {
+		return false
+	}
+	
+	cmd := exec.Command("fvm", "list")
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	
+	return strings.Contains(string(output), version)
+}
+
+func checkDockerImageExists(image string, tag string) bool {
+	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/tags/%s", image, tag)
+	resp, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	
+	return resp.StatusCode == 200
+}
+
+func getFlutterVersionInfo() (*FlutterVersionInfo, error) {
+	// Force fresh fetch from GitHub API
+	releases, err := fetchFlutterReleases()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Flutter releases from GitHub: %v", err)
+	}
+
+	if len(releases) == 0 {
+		return nil, fmt.Errorf("no Flutter releases found")
+	}
+
+	// Find latest stable version
+	var latestVersion string
+	for _, release := range releases {
+		tagLower := strings.ToLower(release.TagName)
+		version := parseVersionFromRelease(release)
+		
+		// Check if this is a stable release
+		isStable := !release.Prerelease &&
+			!strings.Contains(tagLower, "beta") && 
+			!strings.Contains(tagLower, "dev") && 
+			!strings.Contains(tagLower, "pre") &&
+			!strings.Contains(tagLower, "rc") &&
+			!strings.Contains(tagLower, "alpha") &&
+			!strings.Contains(tagLower, "hotfix") &&
+			!strings.Contains(version, "-") &&
+			regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(version)
+			
+		if isStable {
+			latestVersion = version
+			break
+		}
+	}
+
+	// If no stable found, use the most recent release
+	if latestVersion == "" {
+		latestVersion = parseVersionFromRelease(releases[0])
+	}
+
+	info := &FlutterVersionInfo{
+		LatestVersion: latestVersion,
+		FVMInstalled:  checkFVMInstalled(),
+	}
+
+	if info.FVMInstalled {
+		info.FVMVersionExists = checkFVMVersionExists(latestVersion)
+	}
+
+	// Check Docker images availability
+	info.DockerImages.Instrumentisto = checkDockerImageExists("instrumentisto/flutter", latestVersion)
+	info.DockerImages.Cirrusci = checkDockerImageExists("cirrusci/flutter", latestVersion)
+
+	// Build details string
+	details := fmt.Sprintf("Latest Flutter Version: %s\n\n", latestVersion)
+	
+	if info.FVMInstalled {
+		details += "FVM Status: ✅ Installed\n"
+		if info.FVMVersionExists {
+			details += fmt.Sprintf("  - Version %s: ✅ Available locally\n", latestVersion)
+		} else {
+			details += fmt.Sprintf("  - Version %s: ❌ Not installed locally\n", latestVersion)
+			details += fmt.Sprintf("  - Install with: fvm install %s\n", latestVersion)
+		}
+	} else {
+		details += "FVM Status: ❌ Not installed\n"
+		details += "  - Install FVM: https://fvm.app/docs/getting_started/installation\n"
+	}
+
+	details += "\nDocker Images:\n"
+	if info.DockerImages.Instrumentisto {
+		details += fmt.Sprintf("  - instrumentisto/flutter:%s ✅ Available\n", latestVersion)
+	} else {
+		details += fmt.Sprintf("  - instrumentisto/flutter:%s ❌ Not available\n", latestVersion)
+	}
+	
+	if info.DockerImages.Cirrusci {
+		details += fmt.Sprintf("  - cirrusci/flutter:%s ✅ Available\n", latestVersion)
+	} else {
+		details += fmt.Sprintf("  - cirrusci/flutter:%s ❌ Not available\n", latestVersion)
+	}
+
+	details += "\nUsage Examples:\n"
+	if info.FVMInstalled {
+		details += fmt.Sprintf("  - FVM: fvm use %s\n", latestVersion)
+	}
+	details += fmt.Sprintf("  - Docker (instrumentisto): docker run -it instrumentisto/flutter:%s\n", latestVersion)
+	details += fmt.Sprintf("  - Docker (cirrusci): docker run -it cirrusci/flutter:%s\n", latestVersion)
+
+	// Add debug info about releases found
+	details += fmt.Sprintf("\n--- Debug Info ---\n")
+	details += fmt.Sprintf("Total releases fetched: %d\n", len(releases))
+	if len(releases) > 0 {
+		details += fmt.Sprintf("Most recent release: %s (prerelease: %v)\n", releases[0].TagName, releases[0].Prerelease)
+	}
+	if len(releases) > 1 {
+		details += fmt.Sprintf("Second release: %s (prerelease: %v)\n", releases[1].TagName, releases[1].Prerelease)
+	}
+
+	info.Details = details
+	return info, nil
+}
+
 func main() {
 	done := make(chan struct{})
 
@@ -375,6 +574,25 @@ func main() {
 			return mcp_golang.NewToolResponse(
 				mcp_golang.NewTextContent(fmt.Sprintf("Successfully updated deprecations cache. Found %d deprecations. Last updated: %s", 
 					len(cache.Deprecations), cache.LastUpdated.Format("2006-01-02 15:04:05"))),
+			), nil
+		})
+	if err != nil {
+		panic(err)
+	}
+
+	err = server.RegisterTool(
+		"check_flutter_version_info",
+		"Get the latest Flutter version and check availability in FVM and Docker images (instrumentisto/flutter and cirrusci/flutter).",
+		func(args NoArguments) (*mcp_golang.ToolResponse, error) {
+			info, err := getFlutterVersionInfo()
+			if err != nil {
+				return mcp_golang.NewToolResponse(
+					mcp_golang.NewTextContent(fmt.Sprintf("Error getting Flutter version info: %v", err)),
+				), nil
+			}
+
+			return mcp_golang.NewToolResponse(
+				mcp_golang.NewTextContent(info.Details),
 			), nil
 		})
 	if err != nil {
