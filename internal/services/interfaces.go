@@ -29,3 +29,10 @@ type DeprecationServiceInterface interface {
 type VersionInfoServiceInterface interface {
 	GetFlutterVersionInfo() (*models.FlutterVersionInfo, error)
 }
+
+// FlutterVersionServiceInterface defines the Flutter version detection contract
+type FlutterVersionServiceInterface interface {
+	GetInstalledFlutterVersion() (string, error)
+	IsFlutterInstalled() bool
+	GetFlutterChannel() (string, error)
+}

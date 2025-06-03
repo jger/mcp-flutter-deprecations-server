@@ -33,7 +33,7 @@ type FlutterVersionInfo struct {
 	FVMVersionExists bool   `json:"fvm_version_exists"`
 	DockerImages     struct {
 		Instrumentisto bool `json:"instrumentisto"`
-		Cirrusci       bool `json:"cirrusci"`
+		CirrusLabs     bool `json:"cirruslabs"`
 	} `json:"docker_images"`
 	Details string `json:"details"`
 }

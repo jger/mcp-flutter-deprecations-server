@@ -68,9 +68,9 @@ Gets the latest stable Flutter version and checks availability across different 
 **Parameters:** None
 
 **Returns:**
-- Latest stable Flutter version
+- Latest stable Flutter version (using Flutter CLI when available)
 - FVM installation status and version availability
-- Docker image availability for `instrumentisto/flutter` and `cirrusci/flutter`
+- Docker image availability for `instrumentisto/flutter` and `ghcr.io/cirruslabs/flutter`
 - Usage examples and installation commands
 
 ## Known Deprecations
