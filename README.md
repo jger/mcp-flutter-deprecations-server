@@ -11,20 +11,30 @@ flutter-deprecations-server/
 │       └── main.go
 ├── internal/            # Private application code
 │   ├── handlers/        # MCP tool handlers
-│   │   └── mcp_handlers.go
+│   │   ├── mcp_handlers.go
+│   │   ├── mcp_handlers_test.go
+│   │   └── testdata/
 │   ├── models/          # Data structures
 │   │   └── flutter.go
 │   └── services/        # Business logic
 │       ├── cache.go
+│       ├── cache_test.go
 │       ├── deprecations.go
+│       ├── deprecations_test.go
 │       ├── flutter_api.go
-│       └── version_info.go
+│       ├── flutter_api_test.go
+│       ├── flutter_version.go
+│       ├── interfaces.go
+│       ├── version_info.go
+│       ├── version_info_test.go
+│       └── testdata/
 ├── pkg/                 # Public libraries
 │   └── config/          # Configuration constants
 │       └── config.go
 ├── bin/                 # Compiled binaries
 ├── Makefile            # Build automation
 ├── go.mod              # Go module definition
+├── go.sum              # Dependency checksums
 └── README.md
 ```
 
@@ -35,7 +45,8 @@ flutter-deprecations-server/
 - **Code analysis**: Analyzes Flutter code snippets for deprecated APIs
 - **Replacement suggestions**: Provides modern alternatives for deprecated APIs
 - **Historical data**: Tracks deprecations from the last 1.5 years
-- **Version checking**: Gets latest Flutter version and checks FVM/Docker availability
+- **Version checking**: Gets latest Flutter version using Flutter CLI (most reliable) with GitHub API fallback
+- **Multi-platform support**: Checks FVM and Docker image availability
 
 ## MCP Tools
 
@@ -68,7 +79,8 @@ Gets the latest stable Flutter version and checks availability across different 
 **Parameters:** None
 
 **Returns:**
-- Latest stable Flutter version (using Flutter CLI when available)
+- Latest stable Flutter version (using Flutter CLI when available, GitHub API fallback)
+- Flutter CLI installation status and channel information
 - FVM installation status and version availability
 - Docker image availability for `instrumentisto/flutter` and `ghcr.io/cirruslabs/flutter`
 - Usage examples and installation commands
@@ -146,6 +158,15 @@ Add to your MCP configuration (e.g., `mcp.json`):
 }
 ```
 
+## Version Detection
+
+The server uses a reliable multi-tier approach to detect the latest Flutter version:
+
+1. **Primary**: Flutter CLI (`flutter --version`) - Most accurate, matches developer environment
+2. **Fallback**: GitHub API releases - Used when Flutter CLI not available
+3. **Channel Detection**: Identifies stable/beta/dev channels
+4. **Docker Registry Support**: Checks both Docker Hub and GitHub Container Registry
+
 ## Cache Location
 
 Deprecations are cached at: `~/.flutter-deprecations/flutter_deprecations.json`
@@ -174,10 +195,17 @@ The project follows Go best practices with a clean architecture:
 ### Services Layer
 
 - **CacheService**: Handles local file caching
-- **FlutterAPIService**: Manages GitHub API interactions
-- **DeprecationService**: Analyzes and manages deprecation data
-- **VersionInfoService**: Provides version and availability information
+- **FlutterAPIService**: Manages GitHub API interactions and Docker registry checks
+- **FlutterVersionService**: Gets Flutter version directly from Flutter CLI
+- **DeprecationService**: Analyzes and manages deprecation data  
+- **VersionInfoService**: Provides comprehensive version and availability information
 
 ### Handlers Layer
 
 - **MCPHandlers**: Implements MCP tool interfaces and coordinates service calls
+
+### Testing
+
+- **Comprehensive test suite**: Unit tests for all services and handlers
+- **Mock services**: Test infrastructure with dependency injection
+- **Test coverage**: Run `make test-coverage` to generate coverage reports
