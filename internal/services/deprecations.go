@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -167,14 +168,72 @@ func (d *DeprecationService) UpdateCache() error {
 		return nil
 	}
 
-	releases, err := d.apiService.FetchReleases()
+	// Fetch deprecations from Flutter source code
+	sourceDeprecations, err := d.apiService.FetchFlutterSourceDeprecations()
+	if err != nil {
+		return fmt.Errorf("failed to fetch source deprecations: %v", err)
+	}
+
+	// Add the known deprecation patterns
+	knownDeprecations := d.getDeprecationPatterns()
+	for _, templateDep := range knownDeprecations {
+		dep := templateDep
+		dep.Version = "Multiple versions"
+		sourceDeprecations = append(sourceDeprecations, dep)
+	}
+	
+	cache.Deprecations = sourceDeprecations
+	cache.LastUpdated = time.Now()
+
+	return d.cacheService.Save(cache)
+}
+
+// UpdateCacheWithProgress updates the deprecations cache with progress reporting
+func (d *DeprecationService) UpdateCacheWithProgress(progressCallback func(string), verbose bool) error {
+	cache, err := d.cacheService.Load()
 	if err != nil {
 		return err
 	}
 
-	deprecations := d.ExtractDeprecationsFromReleaseNotes(releases)
+	if time.Since(cache.LastUpdated) < config.CACHE_DURATION {
+		progressCallback("Cache is up to date, skipping update")
+		if verbose {
+			log.Printf("Cache last updated: %s, duration threshold: %s", cache.LastUpdated.Format("2006-01-02 15:04:05"), config.CACHE_DURATION)
+		}
+		return nil
+	}
+
+	progressCallback("🖻 Scanning Flutter source code for @Deprecated annotations...")
+	if verbose {
+		log.Println("Starting Flutter source code scan")
+	}
+
+	// Fetch deprecations from Flutter source code
+	sourceDeprecations, err := d.apiService.FetchFlutterSourceDeprecationsWithProgress(progressCallback, verbose)
+	if err != nil {
+		return fmt.Errorf("failed to fetch source deprecations: %v", err)
+	}
+
+	progressCallback(fmt.Sprintf("📊 Found %d deprecations from source code", len(sourceDeprecations)))
+	if verbose {
+		log.Printf("Found %d deprecations from source scan", len(sourceDeprecations))
+	}
+
+	progressCallback("📁 Adding known deprecation patterns...")
+	// Add the known deprecation patterns
+	knownDeprecations := d.getDeprecationPatterns()
+	for _, templateDep := range knownDeprecations {
+		dep := templateDep
+		dep.Version = "Multiple versions"
+		sourceDeprecations = append(sourceDeprecations, dep)
+	}
+
+	progressCallback(fmt.Sprintf("💾 Saving %d total deprecations to cache...", len(sourceDeprecations)))
+	if verbose {
+		log.Printf("Saving %d deprecations to cache", len(sourceDeprecations))
+	}
 	
-	cache.Deprecations = deprecations
+	cache.Deprecations = sourceDeprecations
 	cache.LastUpdated = time.Now()
 
 	return d.cacheService.Save(cache)

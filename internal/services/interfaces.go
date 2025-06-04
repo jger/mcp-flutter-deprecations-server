@@ -16,6 +16,8 @@ type FlutterAPIServiceInterface interface {
 	CheckFVMInstalled() bool
 	CheckFVMVersionExists(version string) bool
 	CheckDockerImageExists(image string, tag string) bool
+	FetchFlutterSourceDeprecations() ([]models.Deprecation, error)
+	FetchFlutterSourceDeprecationsWithProgress(progressCallback func(string), verbose bool) ([]models.Deprecation, error)
 }
 
 // DeprecationServiceInterface defines the deprecation service contract

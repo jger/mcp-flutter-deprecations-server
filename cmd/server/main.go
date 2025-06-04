@@ -1,7 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/example/flutter-deprecations-server/internal/handlers"
 	"github.com/example/flutter-deprecations-server/internal/services"
@@ -10,6 +13,20 @@ import (
 )
 
 func main() {
+	// Parse command line flags
+	update := flag.Bool("update", false, "Update the Flutter deprecations cache and exit")
+	verbose := flag.Bool("vvv", false, "Enable verbose logging")
+	flag.Parse()
+
+	// Configure logging based on verbose flag
+	if *verbose {
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+		log.Println("Verbose logging enabled")
+	} else {
+		// Disable logging for normal operation
+		log.SetOutput(os.Stderr)
+	}
+
 	done := make(chan struct{})
 
 	// Initialize services
@@ -17,6 +34,31 @@ func main() {
 	apiService := services.NewFlutterAPIService()
 	deprecationService := services.NewDeprecationService(cacheService, apiService)
 	versionInfoService := services.NewVersionInfoService(apiService)
+
+	// Handle update flag
+	if *update {
+		fmt.Println("🔄 Updating Flutter deprecations cache...")
+		
+		// Create a progress callback
+		progressCallback := func(message string) {
+			fmt.Printf("  %s\n", message)
+		}
+		
+		if err := deprecationService.UpdateCacheWithProgress(progressCallback, *verbose); err != nil {
+			fmt.Printf("❌ Error updating deprecations cache: %v\n", err)
+			os.Exit(1)
+		}
+		
+		cache, err := cacheService.Load()
+		if err != nil {
+			fmt.Printf("❌ Cache updated but failed to load for verification: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("✅ Successfully updated deprecations cache. Found %d deprecations. Last updated: %s\n",
+			len(cache.Deprecations), cache.LastUpdated.Format("2006-01-02 15:04:05"))
+		return
+	}
 
 	// Initialize handlers
 	mcpHandlers := handlers.NewMCPHandlers(deprecationService, versionInfoService, cacheService)
@@ -46,13 +88,6 @@ func main() {
 		panic(err)
 	}
 
-	err = server.RegisterTool(
-		"update_flutter_deprecations",
-		"Manually update the Flutter deprecations cache by fetching the latest release information from GitHub.",
-		mcpHandlers.UpdateFlutterDeprecations)
-	if err != nil {
-		panic(err)
-	}
 
 	err = server.RegisterTool(
 		"check_flutter_version_info",

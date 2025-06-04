@@ -40,13 +40,15 @@ flutter-deprecations-server/
 
 ## Features
 
-- **Automatic deprecation tracking**: Fetches Flutter releases from GitHub and extracts deprecation information
+- **Source-based deprecation tracking**: Directly scans Flutter's GitHub source code for `@Deprecated` annotations
 - **Local caching**: Stores deprecations locally with 24-hour cache duration
 - **Code analysis**: Analyzes Flutter code snippets for deprecated APIs
 - **Replacement suggestions**: Provides modern alternatives for deprecated APIs
-- **Historical data**: Tracks deprecations from the last 1.5 years
+- **Comprehensive scanning**: Scans key Flutter directories (widgets, material, cupertino, services, etc.)
 - **Version checking**: Gets latest Flutter version using Flutter CLI (most reliable) with GitHub API fallback
 - **Multi-platform support**: Checks FVM and Docker image availability
+- **Command-line update**: Manual cache updates via `--update` flag with progress reporting
+- **Verbose logging**: Detailed logging with `-vvv` flag for troubleshooting
 
 ## MCP Tools
 
@@ -68,12 +70,7 @@ Lists all known Flutter deprecations from the cache.
 
 **Returns:** Complete list of deprecations with replacements and version information.
 
-### 3. `update_flutter_deprecations`
-Manually updates the deprecations cache by fetching the latest Flutter releases.
-
-**Parameters:** None
-
-### 4. `check_flutter_version_info`
+### 3. `check_flutter_version_info`
 Gets the latest stable Flutter version and checks availability across different tools and platforms.
 
 **Parameters:** None
@@ -124,6 +121,12 @@ go build -o bin/flutter-deprecations-server ./cmd/server
 
 # Run the server
 ./bin/flutter-deprecations-server
+
+# Update deprecations cache manually
+./bin/flutter-deprecations-server --update
+
+# Update with verbose logging
+./bin/flutter-deprecations-server --update -vvv
 ```
 
 ## Development
@@ -178,10 +181,18 @@ The cache is automatically updated every 24 hours when tools are used.
 Ask your AI assistant:
 - "Check this Flutter code for deprecations: `Color.red.withOpacity(0.5)`"
 - "List all Flutter deprecations"
-- "Update the Flutter deprecations cache"
 - "What should I use instead of RaisedButton?"
 - "What's the latest Flutter version and is it available in FVM and Docker?"
 - "Check Flutter version info"
+
+To manually update the deprecations cache, run:
+```bash
+# Basic update with progress reporting
+./bin/flutter-deprecations-server --update
+
+# Update with verbose logging for troubleshooting
+./bin/flutter-deprecations-server --update -vvv
+```
 
 ## Architecture
 
@@ -195,9 +206,9 @@ The project follows Go best practices with a clean architecture:
 ### Services Layer
 
 - **CacheService**: Handles local file caching
-- **FlutterAPIService**: Manages GitHub API interactions and Docker registry checks
+- **FlutterAPIService**: Manages GitHub API interactions, source code scanning, and Docker registry checks
 - **FlutterVersionService**: Gets Flutter version directly from Flutter CLI
-- **DeprecationService**: Analyzes and manages deprecation data  
+- **DeprecationService**: Analyzes and manages deprecation data from Flutter source code
 - **VersionInfoService**: Provides comprehensive version and availability information
 
 ### Handlers Layer

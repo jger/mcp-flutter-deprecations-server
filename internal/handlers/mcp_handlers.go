@@ -97,27 +97,6 @@ func (h *MCPHandlers) ListFlutterDeprecations(args models.NoArguments) (*mcp_gol
 	), nil
 }
 
-// UpdateFlutterDeprecations handles the update_flutter_deprecations tool
-func (h *MCPHandlers) UpdateFlutterDeprecations(args models.NoArguments) (*mcp_golang.ToolResponse, error) {
-	err := h.deprecationService.UpdateCache()
-	if err != nil {
-		return mcp_golang.NewToolResponse(
-			mcp_golang.NewTextContent(fmt.Sprintf("Error updating deprecations cache: %v", err)),
-		), nil
-	}
-
-	cache, err := h.cacheService.Load()
-	if err != nil {
-		return mcp_golang.NewToolResponse(
-			mcp_golang.NewTextContent("Cache updated but failed to load for verification."),
-		), nil
-	}
-
-	return mcp_golang.NewToolResponse(
-		mcp_golang.NewTextContent(fmt.Sprintf("Successfully updated deprecations cache. Found %d deprecations. Last updated: %s", 
-			len(cache.Deprecations), cache.LastUpdated.Format("2006-01-02 15:04:05"))),
-	), nil
-}
 
 // CheckFlutterVersionInfo handles the check_flutter_version_info tool
 func (h *MCPHandlers) CheckFlutterVersionInfo(args models.NoArguments) (*mcp_golang.ToolResponse, error) {
