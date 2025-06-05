@@ -33,6 +33,22 @@ func (f *FlutterAPIService) FetchReleases() ([]models.FlutterRelease, error) {
 	}
 	defer resp.Body.Close()
 
+	// Check for rate limiting
+	if resp.StatusCode == 403 || resp.StatusCode == 401 || resp.StatusCode == 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		var errorResp struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(body, &errorResp) == nil && strings.Contains(errorResp.Message, "API rate limit exceeded") {
+			return nil, fmt.Errorf("GitHub API rate limit exceeded. Please wait before retrying or authenticate with a GitHub token")
+		}
+		return nil, fmt.Errorf("GitHub API access forbidden (403): %s", errorResp.Message)
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -216,6 +232,18 @@ func (f *FlutterAPIService) scanDirectoryForDeprecations(baseURL string) ([]mode
 	}
 	defer resp.Body.Close()
 	
+	// Check for rate limiting
+	if resp.StatusCode == 403 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		var errorResp struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(body, &errorResp) == nil && strings.Contains(errorResp.Message, "API rate limit exceeded") {
+			return nil, fmt.Errorf("GitHub API rate limit exceeded. Please wait before retrying or authenticate with a GitHub token")
+		}
+		return nil, fmt.Errorf("GitHub API access forbidden (403): %s", errorResp.Message)
+	}
+	
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to fetch directory listing: %d", resp.StatusCode)
 	}
@@ -396,6 +424,18 @@ func (f *FlutterAPIService) scanDirectoryForDeprecationsWithProgress(baseURL str
 		return nil, err
 	}
 	defer resp.Body.Close()
+	
+	// Check for rate limiting
+	if resp.StatusCode == 403 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		var errorResp struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(body, &errorResp) == nil && strings.Contains(errorResp.Message, "API rate limit exceeded") {
+			return nil, fmt.Errorf("GitHub API rate limit exceeded. Please wait before retrying or authenticate with a GitHub token")
+		}
+		return nil, fmt.Errorf("GitHub API access forbidden (403): %s", errorResp.Message)
+	}
 	
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to fetch directory listing: %d", resp.StatusCode)

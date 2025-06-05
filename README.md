@@ -47,7 +47,9 @@ flutter-deprecations-server/
 - **Comprehensive scanning**: Scans key Flutter directories (widgets, material, cupertino, services, etc.)
 - **Version checking**: Gets latest Flutter version using Flutter CLI (most reliable) with GitHub API fallback
 - **Multi-platform support**: Checks FVM and Docker image availability
-- **Command-line update**: Manual cache updates via `--update` flag with progress reporting
+- **Command-line cache management**: Manual cache updates and clearing with progress reporting
+- **Short command options**: Support for both long and short command flags
+- **Rate limit handling**: Graceful handling of GitHub API rate limits with helpful error messages
 - **Verbose logging**: Detailed logging with `-vvv` flag for troubleshooting
 
 ## MCP Tools
@@ -125,8 +127,14 @@ go build -o bin/flutter-deprecations-server ./cmd/server
 # Update deprecations cache manually
 ./bin/flutter-deprecations-server --update
 
-# Update with verbose logging
+# Update with verbose logging  
 ./bin/flutter-deprecations-server --update -vvv
+
+# Clear deprecations cache
+./bin/flutter-deprecations-server --clear-cache
+
+# Show help information
+./bin/flutter-deprecations-server --help
 ```
 
 ## Development
@@ -185,14 +193,37 @@ Ask your AI assistant:
 - "What's the latest Flutter version and is it available in FVM and Docker?"
 - "Check Flutter version info"
 
-To manually update the deprecations cache, run:
+## Command Line Usage
+
+The server supports several command-line options for cache management:
+
 ```bash
-# Basic update with progress reporting
+# Show help and available options
+./bin/flutter-deprecations-server --help
+./bin/flutter-deprecations-server -h        # Short version
+
+# Update deprecations cache with progress reporting
 ./bin/flutter-deprecations-server --update
+./bin/flutter-deprecations-server -u        # Short version
 
 # Update with verbose logging for troubleshooting
 ./bin/flutter-deprecations-server --update -vvv
+./bin/flutter-deprecations-server -u -vvv   # Short version
+
+# Clear deprecations cache
+./bin/flutter-deprecations-server --clear-cache
+./bin/flutter-deprecations-server -cc       # Short version
+
+# Start the MCP server (default behavior)
+./bin/flutter-deprecations-server
 ```
+
+### Available Options
+
+- `--help, -h`: Show help information with usage examples
+- `--update, -u`: Update the Flutter deprecations cache and exit
+- `--clear-cache, -cc`: Clear the Flutter deprecations cache and exit  
+- `--vvv`: Enable verbose logging for detailed troubleshooting
 
 ## Architecture
 
@@ -205,8 +236,8 @@ The project follows Go best practices with a clean architecture:
 
 ### Services Layer
 
-- **CacheService**: Handles local file caching
-- **FlutterAPIService**: Manages GitHub API interactions, source code scanning, and Docker registry checks
+- **CacheService**: Handles local file caching with clear functionality
+- **FlutterAPIService**: Manages GitHub API interactions with rate limit handling, source code scanning, and Docker registry checks
 - **FlutterVersionService**: Gets Flutter version directly from Flutter CLI
 - **DeprecationService**: Analyzes and manages deprecation data from Flutter source code
 - **VersionInfoService**: Provides comprehensive version and availability information

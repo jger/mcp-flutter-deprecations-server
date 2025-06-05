@@ -15,6 +15,11 @@ import (
 func main() {
 	// Parse command line flags
 	update := flag.Bool("update", false, "Update the Flutter deprecations cache and exit")
+	updateShort := flag.Bool("u", false, "Update the Flutter deprecations cache and exit (short)")
+	clearCache := flag.Bool("clear-cache", false, "Clear the Flutter deprecations cache and exit")
+	clearCacheShort := flag.Bool("cc", false, "Clear the Flutter deprecations cache and exit (short)")
+	help := flag.Bool("help", false, "Show help information")
+	helpShort := flag.Bool("h", false, "Show help information (short)")
 	verbose := flag.Bool("vvv", false, "Enable verbose logging")
 	flag.Parse()
 
@@ -35,8 +40,42 @@ func main() {
 	deprecationService := services.NewDeprecationService(cacheService, apiService)
 	versionInfoService := services.NewVersionInfoService(apiService)
 
+	// Handle help flag
+	if *help || *helpShort {
+		fmt.Println("Flutter Deprecations MCP Server")
+		fmt.Println("")
+		fmt.Println("Usage:")
+		fmt.Println("  server [options]")
+		fmt.Println("")
+		fmt.Println("Options:")
+		fmt.Println("  --update, -u       Update the Flutter deprecations cache and exit")
+		fmt.Println("  --clear-cache, -cc Clear the Flutter deprecations cache and exit")
+		fmt.Println("  --help, -h         Show this help information")
+		fmt.Println("  --vvv              Enable verbose logging")
+		fmt.Println("")
+		fmt.Println("Examples:")
+		fmt.Println("  server             Start the MCP server")
+		fmt.Println("  server -u          Update deprecations cache")
+		fmt.Println("  server -cc         Clear deprecations cache")
+		fmt.Println("  server --vvv       Start with verbose logging")
+		return
+	}
+
+	// Handle clear cache flag
+	if *clearCache || *clearCacheShort {
+		fmt.Println("🗑️ Clearing Flutter deprecations cache...")
+		
+		if err := cacheService.Clear(); err != nil {
+			fmt.Printf("❌ Error clearing deprecations cache: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Println("✅ Successfully cleared deprecations cache")
+		return
+	}
+
 	// Handle update flag
-	if *update {
+	if *update || *updateShort {
 		fmt.Println("🔄 Updating Flutter deprecations cache...")
 		
 		// Create a progress callback

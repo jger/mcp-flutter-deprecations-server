@@ -65,3 +65,14 @@ func (c *CacheService) Save(cache *models.DeprecationCache) error {
 
 	return ioutil.WriteFile(cachePath, data, 0644)
 }
+
+// Clear removes all cached data by deleting the cache file
+func (c *CacheService) Clear() error {
+	cachePath := filepath.Join(c.getCacheDir(), config.CACHE_FILE)
+	
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		return nil // Cache file doesn't exist, nothing to clear
+	}
+	
+	return os.Remove(cachePath)
+}
