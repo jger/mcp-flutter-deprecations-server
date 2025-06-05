@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
-	"github.com/example/flutter-deprecations-server/pkg/config"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/pkg/config"
 )
 
 // DeprecationService handles deprecation analysis and management
@@ -72,7 +72,7 @@ func (d *DeprecationService) isVersionFromLast18Months(publishedAt string) bool 
 	if err != nil {
 		return false
 	}
-	
+
 	cutoff := time.Now().AddDate(0, -18, 0)
 	return publishTime.After(cutoff)
 }
@@ -80,7 +80,7 @@ func (d *DeprecationService) isVersionFromLast18Months(publishedAt string) bool 
 // ExtractDeprecationsFromReleaseNotes extracts deprecations from Flutter release notes
 func (d *DeprecationService) ExtractDeprecationsFromReleaseNotes(releases []models.FlutterRelease) []models.Deprecation {
 	var deprecations []models.Deprecation
-	
+
 	// More specific patterns for real Flutter API deprecations
 	patterns := []string{
 		`(?i)deprecated[:\s]+([A-Z][a-zA-Z0-9_.]*)\s*(?:in favor of|replaced by|use)\s+([A-Z][a-zA-Z0-9_.]*)`,
@@ -181,7 +181,7 @@ func (d *DeprecationService) UpdateCache() error {
 		dep.Version = "Multiple versions"
 		sourceDeprecations = append(sourceDeprecations, dep)
 	}
-	
+
 	cache.Deprecations = sourceDeprecations
 	cache.LastUpdated = time.Now()
 
@@ -232,7 +232,7 @@ func (d *DeprecationService) UpdateCacheWithProgress(progressCallback func(strin
 	if verbose {
 		log.Printf("Saving %d deprecations to cache", len(sourceDeprecations))
 	}
-	
+
 	cache.Deprecations = sourceDeprecations
 	cache.LastUpdated = time.Now()
 

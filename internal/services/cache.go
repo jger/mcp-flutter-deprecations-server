@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
-	"github.com/example/flutter-deprecations-server/pkg/config"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/pkg/config"
 )
 
 // CacheService handles local cache operations
@@ -32,7 +32,7 @@ func (c *CacheService) ensureCacheDir() error {
 // Load loads the deprecation cache from disk
 func (c *CacheService) Load() (*models.DeprecationCache, error) {
 	cachePath := filepath.Join(c.getCacheDir(), config.CACHE_FILE)
-	
+
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		return &models.DeprecationCache{Deprecations: []models.Deprecation{}}, nil
 	}
@@ -69,10 +69,10 @@ func (c *CacheService) Save(cache *models.DeprecationCache) error {
 // Clear removes all cached data by deleting the cache file
 func (c *CacheService) Clear() error {
 	cachePath := filepath.Join(c.getCacheDir(), config.CACHE_FILE)
-	
+
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		return nil // Cache file doesn't exist, nothing to clear
 	}
-	
+
 	return os.Remove(cachePath)
 }

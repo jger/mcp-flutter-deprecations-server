@@ -1,6 +1,6 @@
 package services
 
-import "github.com/example/flutter-deprecations-server/internal/models"
+import "github.com/jger/mcp-flutter-deprecations-server/internal/models"
 
 // CacheServiceInterface defines the cache service contract
 type CacheServiceInterface interface {

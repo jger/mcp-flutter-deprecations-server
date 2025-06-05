@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
 )
 
 // TestCacheServiceImpl implements CacheServiceInterface for testing
@@ -26,7 +26,7 @@ func (t *TestCacheServiceImpl) ensureCacheDir() error {
 
 func (t *TestCacheServiceImpl) Load() (*models.DeprecationCache, error) {
 	cachePath := filepath.Join(t.getCacheDir(), "flutter_deprecations.json")
-	
+
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		return &models.DeprecationCache{Deprecations: []models.Deprecation{}}, nil
 	}
@@ -62,7 +62,7 @@ func (t *TestCacheServiceImpl) Save(cache *models.DeprecationCache) error {
 func TestCacheService(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	// Create cache service with custom cache dir
 	cacheService := &TestCacheServiceImpl{
 		tempDir: tempDir,
@@ -124,7 +124,7 @@ func TestCacheService(t *testing.T) {
 	t.Run("Cache directory creation", func(t *testing.T) {
 		// Remove the temp directory
 		os.RemoveAll(tempDir)
-		
+
 		// Try to save cache (should create directory)
 		testCache := &models.DeprecationCache{
 			LastUpdated:  time.Now(),

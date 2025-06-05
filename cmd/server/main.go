@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/example/flutter-deprecations-server/internal/handlers"
-	"github.com/example/flutter-deprecations-server/internal/services"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/handlers"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/services"
 	mcp_golang "github.com/metoro-io/mcp-golang"
 	"github.com/metoro-io/mcp-golang/transport/stdio"
 )
@@ -64,12 +64,12 @@ func main() {
 	// Handle clear cache flag
 	if *clearCache || *clearCacheShort {
 		fmt.Println("🗑️ Clearing Flutter deprecations cache...")
-		
+
 		if err := cacheService.Clear(); err != nil {
 			fmt.Printf("❌ Error clearing deprecations cache: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		fmt.Println("✅ Successfully cleared deprecations cache")
 		return
 	}
@@ -77,23 +77,23 @@ func main() {
 	// Handle update flag
 	if *update || *updateShort {
 		fmt.Println("🔄 Updating Flutter deprecations cache...")
-		
+
 		// Create a progress callback
 		progressCallback := func(message string) {
 			fmt.Printf("  %s\n", message)
 		}
-		
+
 		if err := deprecationService.UpdateCacheWithProgress(progressCallback, *verbose); err != nil {
 			fmt.Printf("❌ Error updating deprecations cache: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		cache, err := cacheService.Load()
 		if err != nil {
 			fmt.Printf("❌ Cache updated but failed to load for verification: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		fmt.Printf("✅ Successfully updated deprecations cache. Found %d deprecations. Last updated: %s\n",
 			len(cache.Deprecations), cache.LastUpdated.Format("2006-01-02 15:04:05"))
 		return
@@ -126,7 +126,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 
 	err = server.RegisterTool(
 		"check_flutter_version_info",

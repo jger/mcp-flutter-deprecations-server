@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
-	"github.com/example/flutter-deprecations-server/internal/services"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/services"
 	mcp_golang "github.com/metoro-io/mcp-golang"
 )
 
 // MCPHandlers contains all MCP tool handlers
 type MCPHandlers struct {
-	deprecationService  services.DeprecationServiceInterface
-	versionInfoService  services.VersionInfoServiceInterface
-	cacheService        services.CacheServiceInterface
+	deprecationService services.DeprecationServiceInterface
+	versionInfoService services.VersionInfoServiceInterface
+	cacheService       services.CacheServiceInterface
 }
 
 // NewMCPHandlers creates a new MCP handlers instance
@@ -28,7 +28,7 @@ func NewMCPHandlers(deprecationService services.DeprecationServiceInterface, ver
 // CheckFlutterDeprecations handles the check_flutter_deprecations tool
 func (h *MCPHandlers) CheckFlutterDeprecations(args models.CheckCodeArgs) (*mcp_golang.ToolResponse, error) {
 	deprecations := h.deprecationService.CheckCodeForDeprecations(args.Code)
-	
+
 	if len(deprecations) == 0 {
 		return mcp_golang.NewToolResponse(
 			mcp_golang.NewTextContent("No deprecated APIs found in the provided code."),
@@ -72,7 +72,7 @@ func (h *MCPHandlers) ListFlutterDeprecations(args models.NoArguments) (*mcp_gol
 	}
 
 	result := fmt.Sprintf("Flutter Deprecations (Last updated: %s)\n\n", cache.LastUpdated.Format("2006-01-02 15:04:05"))
-	
+
 	sort.Slice(cache.Deprecations, func(i, j int) bool {
 		return cache.Deprecations[i].API < cache.Deprecations[j].API
 	})
@@ -96,7 +96,6 @@ func (h *MCPHandlers) ListFlutterDeprecations(args models.NoArguments) (*mcp_gol
 		mcp_golang.NewTextContent(result),
 	), nil
 }
-
 
 // CheckFlutterVersionInfo handles the check_flutter_version_info tool
 func (h *MCPHandlers) CheckFlutterVersionInfo(args models.NoArguments) (*mcp_golang.ToolResponse, error) {

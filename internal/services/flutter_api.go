@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
-	"github.com/example/flutter-deprecations-server/pkg/config"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/pkg/config"
 )
 
 // FlutterAPIService handles Flutter API interactions
@@ -90,28 +90,28 @@ func (f *FlutterAPIService) GetLatestStableVersion() (string, error) {
 	for _, release := range releases {
 		tagLower := strings.ToLower(release.TagName)
 		version := f.ParseVersionFromRelease(release)
-		
+
 		// Check if this is a stable release
 		isStable := !release.Prerelease &&
-			!strings.Contains(tagLower, "beta") && 
-			!strings.Contains(tagLower, "dev") && 
+			!strings.Contains(tagLower, "beta") &&
+			!strings.Contains(tagLower, "dev") &&
 			!strings.Contains(tagLower, "pre") &&
 			!strings.Contains(tagLower, "rc") &&
 			!strings.Contains(tagLower, "alpha") &&
 			!strings.Contains(tagLower, "hotfix") &&
 			!strings.Contains(version, "-") &&
 			regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(version)
-			
+
 		if isStable {
 			return version, nil
 		}
 	}
-	
+
 	// If no stable release found, return the latest release regardless
 	if len(releases) > 0 {
 		return f.ParseVersionFromRelease(releases[0]), nil
 	}
-	
+
 	return "", fmt.Errorf("no releases found")
 }
 
@@ -126,13 +126,13 @@ func (f *FlutterAPIService) CheckFVMVersionExists(version string) bool {
 	if !f.CheckFVMInstalled() {
 		return false
 	}
-	
+
 	cmd := exec.Command("fvm", "list")
 	output, err := cmd.Output()
 	if err != nil {
 		return false
 	}
-	
+
 	return strings.Contains(string(output), version)
 }
 
@@ -156,7 +156,7 @@ func (f *FlutterAPIService) checkDockerHubImageExists(image string, tag string) 
 		return false
 	}
 	defer resp.Body.Close()
-	
+
 	return resp.StatusCode == 200
 }
 
@@ -172,16 +172,16 @@ func (f *FlutterAPIService) checkGHCRImageExists(image string, tag string) bool 
 			return false
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != 200 {
 			return false
 		}
-		
+
 		// For simplicity, if the package exists, assume the tag exists
 		// In a real implementation, you'd parse the JSON and check for the specific tag
 		return true
 	}
-	
+
 	return false
 }
 
@@ -189,7 +189,7 @@ func (f *FlutterAPIService) checkGHCRImageExists(image string, tag string) bool 
 func (f *FlutterAPIService) FetchFlutterSourceDeprecations() ([]models.Deprecation, error) {
 	// Base URL for Flutter source code on GitHub
 	baseURL := "https://raw.githubusercontent.com/flutter/flutter/master/packages/flutter/lib/src/"
-	
+
 	// Key directories to search for deprecations
 	directories := []string{
 		"widgets/",
@@ -202,9 +202,9 @@ func (f *FlutterAPIService) FetchFlutterSourceDeprecations() ([]models.Deprecati
 		"gestures/",
 		"animation/",
 	}
-	
+
 	var deprecations []models.Deprecation
-	
+
 	// For each directory, we'll fetch a directory listing and then scan files
 	for _, dir := range directories {
 		dirDeprecations, err := f.scanDirectoryForDeprecations(baseURL + dir)
@@ -215,7 +215,7 @@ func (f *FlutterAPIService) FetchFlutterSourceDeprecations() ([]models.Deprecati
 		}
 		deprecations = append(deprecations, dirDeprecations...)
 	}
-	
+
 	return deprecations, nil
 }
 
@@ -225,13 +225,13 @@ func (f *FlutterAPIService) scanDirectoryForDeprecations(baseURL string) ([]mode
 	// we'll use the GitHub API to get directory contents first
 	apiURL := strings.Replace(baseURL, "https://raw.githubusercontent.com/", "https://api.github.com/repos/", 1)
 	apiURL = strings.Replace(apiURL, "/master/", "/contents/", 1)
-	
+
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	// Check for rate limiting
 	if resp.StatusCode == 403 {
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -243,27 +243,27 @@ func (f *FlutterAPIService) scanDirectoryForDeprecations(baseURL string) ([]mode
 		}
 		return nil, fmt.Errorf("GitHub API access forbidden (403): %s", errorResp.Message)
 	}
-	
+
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to fetch directory listing: %d", resp.StatusCode)
 	}
-	
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var files []struct {
 		Name string `json:"name"`
 		Type string `json:"type"`
 	}
-	
+
 	if err := json.Unmarshal(body, &files); err != nil {
 		return nil, err
 	}
-	
+
 	var deprecations []models.Deprecation
-	
+
 	// Process each Dart file
 	for _, file := range files {
 		if file.Type == "file" && strings.HasSuffix(file.Name, ".dart") {
@@ -276,7 +276,7 @@ func (f *FlutterAPIService) scanDirectoryForDeprecations(baseURL string) ([]mode
 			deprecations = append(deprecations, fileDeprecations...)
 		}
 	}
-	
+
 	return deprecations, nil
 }
 
@@ -287,29 +287,29 @@ func (f *FlutterAPIService) scanFileForDeprecations(fileURL string) ([]models.De
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to fetch file: %d", resp.StatusCode)
 	}
-	
+
 	var deprecations []models.Deprecation
 	scanner := bufio.NewScanner(resp.Body)
-	
+
 	var currentDeprecation *models.Deprecation
 	var collectingDeprecation bool
 	var deprecationMessage strings.Builder
-	
+
 	// Regex patterns for extracting deprecation info
 	deprecatedPattern := regexp.MustCompile(`@[Dd]eprecated\s*\(\s*['"](.+?)['"]`)
 	classPattern := regexp.MustCompile(`(?:class|enum|mixin)\s+(\w+)`)
 	methodPattern := regexp.MustCompile(`(?:static\s+)?(?:[\w<>]+\s+)?(\w+)\s*\(`)
 	constructorPattern := regexp.MustCompile(`(\w+)\s*\.\s*(\w+)\s*\(`)
-	
+
 	lineNumber := 0
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		lineNumber++
-		
+
 		// Look for @Deprecated annotation
 		if matches := deprecatedPattern.FindStringSubmatch(line); len(matches) > 1 {
 			currentDeprecation = &models.Deprecation{
@@ -319,17 +319,17 @@ func (f *FlutterAPIService) scanFileForDeprecations(fileURL string) ([]models.De
 			deprecationMessage.Reset()
 			continue
 		}
-		
+
 		// If we're collecting a deprecation, look for the deprecated item
 		if collectingDeprecation && currentDeprecation != nil {
 			// Skip empty lines and comments
 			if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "/*") {
 				continue
 			}
-			
+
 			// Look for class, method, constructor, or property
 			var apiName string
-			
+
 			if matches := classPattern.FindStringSubmatch(line); len(matches) > 1 {
 				apiName = matches[1]
 			} else if matches := constructorPattern.FindStringSubmatch(line); len(matches) > 2 {
@@ -337,10 +337,10 @@ func (f *FlutterAPIService) scanFileForDeprecations(fileURL string) ([]models.De
 			} else if matches := methodPattern.FindStringSubmatch(line); len(matches) > 1 {
 				apiName = matches[1]
 			}
-			
+
 			if apiName != "" {
 				currentDeprecation.API = apiName
-				
+
 				// Try to extract replacement from description
 				desc := currentDeprecation.Description
 				if strings.Contains(strings.ToLower(desc), "use ") {
@@ -350,14 +350,14 @@ func (f *FlutterAPIService) scanFileForDeprecations(fileURL string) ([]models.De
 						currentDeprecation.Replacement = useMatches[1]
 					}
 				}
-				
+
 				deprecations = append(deprecations, *currentDeprecation)
 				currentDeprecation = nil
 				collectingDeprecation = false
 			}
 		}
 	}
-	
+
 	return deprecations, scanner.Err()
 }
 
@@ -365,7 +365,7 @@ func (f *FlutterAPIService) scanFileForDeprecations(fileURL string) ([]models.De
 func (f *FlutterAPIService) FetchFlutterSourceDeprecationsWithProgress(progressCallback func(string), verbose bool) ([]models.Deprecation, error) {
 	// Base URL for Flutter source code on GitHub
 	baseURL := "https://raw.githubusercontent.com/flutter/flutter/master/packages/flutter/lib/src/"
-	
+
 	// Key directories to search for deprecations
 	directories := []string{
 		"widgets/",
@@ -378,16 +378,16 @@ func (f *FlutterAPIService) FetchFlutterSourceDeprecationsWithProgress(progressC
 		"gestures/",
 		"animation/",
 	}
-	
+
 	var deprecations []models.Deprecation
-	
+
 	// For each directory, we'll fetch a directory listing and then scan files
 	for i, dir := range directories {
 		progressCallback(fmt.Sprintf("📂 Scanning directory %d/%d: %s", i+1, len(directories), dir))
 		if verbose {
 			log.Printf("Scanning directory: %s", dir)
 		}
-		
+
 		dirDeprecations, err := f.scanDirectoryForDeprecationsWithProgress(baseURL+dir, progressCallback, verbose)
 		if err != nil {
 			// Log error but continue with other directories
@@ -398,12 +398,12 @@ func (f *FlutterAPIService) FetchFlutterSourceDeprecationsWithProgress(progressC
 			continue
 		}
 		deprecations = append(deprecations, dirDeprecations...)
-		
+
 		if verbose {
 			log.Printf("Found %d deprecations in directory %s", len(dirDeprecations), dir)
 		}
 	}
-	
+
 	progressCallback(fmt.Sprintf("✅ Completed scanning %d directories", len(directories)))
 	return deprecations, nil
 }
@@ -414,17 +414,17 @@ func (f *FlutterAPIService) scanDirectoryForDeprecationsWithProgress(baseURL str
 	// we'll use the GitHub API to get directory contents first
 	apiURL := strings.Replace(baseURL, "https://raw.githubusercontent.com/", "https://api.github.com/repos/", 1)
 	apiURL = strings.Replace(apiURL, "/master/", "/contents/", 1)
-	
+
 	if verbose {
 		log.Printf("Fetching directory listing from: %s", apiURL)
 	}
-	
+
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	// Check for rate limiting
 	if resp.StatusCode == 403 {
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -436,45 +436,45 @@ func (f *FlutterAPIService) scanDirectoryForDeprecationsWithProgress(baseURL str
 		}
 		return nil, fmt.Errorf("GitHub API access forbidden (403): %s", errorResp.Message)
 	}
-	
+
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to fetch directory listing: %d", resp.StatusCode)
 	}
-	
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var files []struct {
 		Name string `json:"name"`
 		Type string `json:"type"`
 	}
-	
+
 	if err := json.Unmarshal(body, &files); err != nil {
 		return nil, err
 	}
-	
+
 	var deprecations []models.Deprecation
 	dartFiles := make([]string, 0)
-	
+
 	// Count Dart files first
 	for _, file := range files {
 		if file.Type == "file" && strings.HasSuffix(file.Name, ".dart") {
 			dartFiles = append(dartFiles, file.Name)
 		}
 	}
-	
+
 	if len(dartFiles) > 0 {
 		progressCallback(fmt.Sprintf("  📜 Found %d Dart files to scan", len(dartFiles)))
 	}
-	
+
 	// Process each Dart file
 	for i, fileName := range dartFiles {
 		if verbose {
 			log.Printf("Scanning file %d/%d: %s", i+1, len(dartFiles), fileName)
 		}
-		
+
 		fileURL := baseURL + fileName
 		fileDeprecations, err := f.scanFileForDeprecations(fileURL)
 		if err != nil {
@@ -484,11 +484,11 @@ func (f *FlutterAPIService) scanDirectoryForDeprecationsWithProgress(baseURL str
 			continue
 		}
 		deprecations = append(deprecations, fileDeprecations...)
-		
+
 		if len(fileDeprecations) > 0 {
 			progressCallback(fmt.Sprintf("  🔍 Found %d deprecations in %s", len(fileDeprecations), fileName))
 		}
 	}
-	
+
 	return deprecations, nil
 }

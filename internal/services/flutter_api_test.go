@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
 )
 
 func TestFlutterAPIService(t *testing.T) {
@@ -58,7 +58,7 @@ func TestFlutterAPIService(t *testing.T) {
 		originalURL := "https://api.github.com/repos/flutter/flutter/releases"
 		// Create a custom service for testing
 		testService := &FlutterAPIService{}
-		
+
 		// Mock the FetchReleases method by creating our own
 		releases, err := func() ([]models.FlutterRelease, error) {
 			resp, err := http.Get(server.URL)
@@ -105,7 +105,7 @@ func TestFlutterAPIService(t *testing.T) {
 	t.Run("GetLatestStableVersion with mock data", func(t *testing.T) {
 		// This test would require mocking the HTTP calls
 		// For now, we'll test the logic with known data
-		
+
 		releases := []models.FlutterRelease{
 			{TagName: "3.19.0-0.1.pre", Prerelease: true, PublishedAt: "2024-12-02T10:00:00Z"},
 			{TagName: "3.32.0", Prerelease: false, PublishedAt: "2024-12-01T10:00:00Z"},

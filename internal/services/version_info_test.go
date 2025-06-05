@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
 )
 
 // MockFlutterAPIService for testing

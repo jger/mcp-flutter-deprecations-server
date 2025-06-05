@@ -1,4 +1,4 @@
-module github.com/example/flutter-deprecations-server
+module github.com/jger/mcp-flutter-deprecations-server
 
 go 1.24.3
 

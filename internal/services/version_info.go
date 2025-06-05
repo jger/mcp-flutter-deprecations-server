@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
 )
 
 // VersionInfoService handles Flutter version information
@@ -32,14 +32,14 @@ func (v *VersionInfoService) GetFlutterVersionInfo() (*models.FlutterVersionInfo
 	// First, try to get version from installed Flutter CLI (most reliable)
 	flutterVersionService := NewFlutterVersionService()
 	flutterInstalled = flutterVersionService.IsFlutterInstalled()
-	
+
 	if flutterInstalled {
 		var err error
 		installedVersion, err = flutterVersionService.GetInstalledFlutterVersion()
 		if err == nil {
 			latestVersion = installedVersion
 			debugInfo = append(debugInfo, fmt.Sprintf("Using installed Flutter version: %s", installedVersion))
-			
+
 			// Get channel info
 			channel, _ = flutterVersionService.GetFlutterChannel()
 			debugInfo = append(debugInfo, fmt.Sprintf("Flutter channel: %s", channel))
@@ -62,19 +62,19 @@ func (v *VersionInfoService) GetFlutterVersionInfo() (*models.FlutterVersionInfo
 		}
 
 		debugInfo = append(debugInfo, "Falling back to GitHub API releases")
-		
+
 		for i, release := range releases {
 			if i < 5 { // Collect debug info for first 5 releases
 				debugInfo = append(debugInfo, fmt.Sprintf("GitHub Release %d: %s (prerelease: %v)", i, release.TagName, release.Prerelease))
 			}
-			
+
 			tagLower := strings.ToLower(release.TagName)
 			version := v.apiService.ParseVersionFromRelease(release)
-			
+
 			// More strict stable release detection
 			isStable := !release.Prerelease &&
-				!strings.Contains(tagLower, "beta") && 
-				!strings.Contains(tagLower, "dev") && 
+				!strings.Contains(tagLower, "beta") &&
+				!strings.Contains(tagLower, "dev") &&
 				!strings.Contains(tagLower, "pre") &&
 				!strings.Contains(tagLower, "rc") &&
 				!strings.Contains(tagLower, "alpha") &&
@@ -88,7 +88,7 @@ func (v *VersionInfoService) GetFlutterVersionInfo() (*models.FlutterVersionInfo
 				!strings.Contains(release.TagName, ".rc") &&
 				!strings.Contains(release.TagName, ".beta") &&
 				!strings.Contains(release.TagName, ".alpha")
-				
+
 			if isStable {
 				latestVersion = version
 				debugInfo = append(debugInfo, fmt.Sprintf("GitHub: Found stable version: %s", version))
@@ -126,7 +126,7 @@ func (v *VersionInfoService) GetFlutterVersionInfo() (*models.FlutterVersionInfo
 // buildDetailsString creates the formatted details string
 func (v *VersionInfoService) buildDetailsString(info *models.FlutterVersionInfo, flutterInstalled bool, installedVersion, channel string, debugInfo []string) string {
 	details := fmt.Sprintf("Latest Flutter Version: %s (Checked: %s)\n\n", info.LatestVersion, time.Now().Format("2006-01-02 15:04:05"))
-	
+
 	// Flutter CLI status
 	if flutterInstalled {
 		details += "Flutter CLI: ✅ Installed\n"
@@ -141,7 +141,7 @@ func (v *VersionInfoService) buildDetailsString(info *models.FlutterVersionInfo,
 		details += "  - Install Flutter: https://docs.flutter.dev/get-started/install\n"
 	}
 	details += "\n"
-	
+
 	// FVM status
 	if info.FVMInstalled {
 		details += "FVM Status: ✅ Installed\n"
@@ -162,7 +162,7 @@ func (v *VersionInfoService) buildDetailsString(info *models.FlutterVersionInfo,
 	} else {
 		details += fmt.Sprintf("  - instrumentisto/flutter:%s ❌ Not available\n", info.LatestVersion)
 	}
-	
+
 	if info.DockerImages.CirrusLabs {
 		details += fmt.Sprintf("  - ghcr.io/cirruslabs/flutter:%s ✅ Available\n", info.LatestVersion)
 	} else {
@@ -178,7 +178,7 @@ func (v *VersionInfoService) buildDetailsString(info *models.FlutterVersionInfo,
 
 	// Add debug info
 	details += fmt.Sprintf("\n--- Debug Info ---\n")
-	
+
 	for _, info := range debugInfo {
 		details += fmt.Sprintf("%s\n", info)
 	}

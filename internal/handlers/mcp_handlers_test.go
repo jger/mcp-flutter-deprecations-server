@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
 )
 
 // MockCacheService for testing

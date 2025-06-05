@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/flutter-deprecations-server/internal/models"
+	"github.com/jger/mcp-flutter-deprecations-server/internal/models"
 )
 
 func TestDeprecationService(t *testing.T) {
@@ -55,7 +55,7 @@ func TestDeprecationService(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				deprecations := depService.CheckCodeForDeprecations(tc.code)
-				
+
 				if len(deprecations) != tc.expectedCount {
 					t.Errorf("Expected %d deprecations, got %d", tc.expectedCount, len(deprecations))
 				}
