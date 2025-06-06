@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/jger/mcp-flutter-deprecations-server/internal/handlers"
 	"github.com/jger/mcp-flutter-deprecations-server/internal/services"
@@ -18,6 +19,8 @@ func main() {
 	updateShort := flag.Bool("u", false, "Update the Flutter deprecations cache and exit (short)")
 	clearCache := flag.Bool("clear-cache", false, "Clear the Flutter deprecations cache and exit")
 	clearCacheShort := flag.Bool("cc", false, "Clear the Flutter deprecations cache and exit (short)")
+	showCache := flag.Bool("show-cache", false, "Display the current Flutter deprecations cache and exit")
+	showCacheShort := flag.Bool("sc", false, "Display the current Flutter deprecations cache and exit (short)")
 	help := flag.Bool("help", false, "Show help information")
 	helpShort := flag.Bool("h", false, "Show help information (short)")
 	verbose := flag.Bool("vvv", false, "Enable verbose logging")
@@ -50,6 +53,7 @@ func main() {
 		fmt.Println("Options:")
 		fmt.Println("  --update, -u       Update the Flutter deprecations cache and exit")
 		fmt.Println("  --clear-cache, -cc Clear the Flutter deprecations cache and exit")
+		fmt.Println("  --show-cache, -sc  Display the current Flutter deprecations cache and exit")
 		fmt.Println("  --help, -h         Show this help information")
 		fmt.Println("  --vvv              Enable verbose logging")
 		fmt.Println("")
@@ -57,6 +61,7 @@ func main() {
 		fmt.Println("  server             Start the MCP server")
 		fmt.Println("  server -u          Update deprecations cache")
 		fmt.Println("  server -cc         Clear deprecations cache")
+		fmt.Println("  server -sc         Show current cache contents")
 		fmt.Println("  server --vvv       Start with verbose logging")
 		return
 	}
@@ -71,6 +76,52 @@ func main() {
 		}
 
 		fmt.Println("✅ Successfully cleared deprecations cache")
+		return
+	}
+
+	// Handle show cache flag
+	if *showCache || *showCacheShort {
+		fmt.Println("📋 Flutter Deprecations Cache Contents")
+		fmt.Println("=" + strings.Repeat("=", 40))
+
+		cache, err := cacheService.Load()
+		if err != nil {
+			fmt.Printf("❌ Error loading deprecations cache: %v\n", err)
+			fmt.Println("💡 Try running with --update to create the cache first")
+			os.Exit(1)
+		}
+
+		if len(cache.Deprecations) == 0 {
+			fmt.Println("📭 No deprecations found in cache")
+			fmt.Println("💡 Try running with --update to populate the cache")
+			return
+		}
+
+		fmt.Printf("📊 Cache Info:\n")
+		fmt.Printf("  Last Updated: %s\n", cache.LastUpdated.Format("2006-01-02 15:04:05"))
+		fmt.Printf("  Total Deprecations: %d\n", len(cache.Deprecations))
+		fmt.Println()
+
+		// Group deprecations by API name for better display
+		fmt.Printf("📜 Deprecations:\n")
+		for i, dep := range cache.Deprecations {
+			fmt.Printf("%d. 🔴 %s\n", i+1, dep.API)
+			if dep.Description != "" {
+				fmt.Printf("   📝 Description: %s\n", dep.Description)
+			}
+			if dep.Replacement != "" {
+				fmt.Printf("   ✅ Replacement: %s\n", dep.Replacement)
+			}
+			if dep.Version != "" {
+				fmt.Printf("   📅 Since version: %s\n", dep.Version)
+			}
+			if dep.Example != "" {
+				fmt.Printf("   💡 Example: %s\n", dep.Example)
+			}
+			fmt.Println()
+		}
+
+		fmt.Printf("✨ Total: %d deprecations found\n", len(cache.Deprecations))
 		return
 	}
 

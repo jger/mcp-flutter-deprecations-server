@@ -133,6 +133,9 @@ go build -o bin/flutter-deprecations-server ./cmd/server
 # Clear deprecations cache
 ./bin/flutter-deprecations-server --clear-cache
 
+# Show current cache contents
+./bin/flutter-deprecations-server --show-cache
+
 # Show help information
 ./bin/flutter-deprecations-server --help
 ```
@@ -214,6 +217,10 @@ The server supports several command-line options for cache management:
 ./bin/flutter-deprecations-server --clear-cache
 ./bin/flutter-deprecations-server -cc       # Short version
 
+# Show current cache contents
+./bin/flutter-deprecations-server --show-cache
+./bin/flutter-deprecations-server -sc       # Short version
+
 # Start the MCP server (default behavior)
 ./bin/flutter-deprecations-server
 ```
@@ -222,7 +229,8 @@ The server supports several command-line options for cache management:
 
 - `--help, -h`: Show help information with usage examples
 - `--update, -u`: Update the Flutter deprecations cache and exit
-- `--clear-cache, -cc`: Clear the Flutter deprecations cache and exit  
+- `--clear-cache, -cc`: Clear the Flutter deprecations cache and exit
+- `--show-cache, -sc`: Display the current Flutter deprecations cache and exit
 - `--vvv`: Enable verbose logging for detailed troubleshooting
 
 ## Architecture

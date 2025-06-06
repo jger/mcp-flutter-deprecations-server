@@ -268,7 +268,7 @@ func (f *FlutterAPIService) scanDirectoryForDeprecations(baseURL string) ([]mode
 	for _, file := range files {
 		if file.Type == "file" && strings.HasSuffix(file.Name, ".dart") {
 			fileURL := baseURL + file.Name
-			fileDeprecations, err := f.scanFileForDeprecations(fileURL)
+			fileDeprecations, err := f.ScanFileForDeprecations(fileURL)
 			if err != nil {
 				fmt.Printf("Warning: Failed to scan file %s: %v\n", file.Name, err)
 				continue
@@ -280,8 +280,8 @@ func (f *FlutterAPIService) scanDirectoryForDeprecations(baseURL string) ([]mode
 	return deprecations, nil
 }
 
-// scanFileForDeprecations scans a single Dart file for @Deprecated annotations
-func (f *FlutterAPIService) scanFileForDeprecations(fileURL string) ([]models.Deprecation, error) {
+// ScanFileForDeprecations scans a single Dart file for @Deprecated annotations (exported for testing)
+func (f *FlutterAPIService) ScanFileForDeprecations(fileURL string) ([]models.Deprecation, error) {
 	resp, err := http.Get(fileURL)
 	if err != nil {
 		return nil, err
@@ -295,70 +295,243 @@ func (f *FlutterAPIService) scanFileForDeprecations(fileURL string) ([]models.De
 	var deprecations []models.Deprecation
 	scanner := bufio.NewScanner(resp.Body)
 
-	var currentDeprecation *models.Deprecation
-	var collectingDeprecation bool
-	var deprecationMessage strings.Builder
-
-	// Regex patterns for extracting deprecation info
-	deprecatedPattern := regexp.MustCompile(`@[Dd]eprecated\s*\(\s*['"](.+?)['"]`)
-	classPattern := regexp.MustCompile(`(?:class|enum|mixin)\s+(\w+)`)
-	methodPattern := regexp.MustCompile(`(?:static\s+)?(?:[\w<>]+\s+)?(\w+)\s*\(`)
-	constructorPattern := regexp.MustCompile(`(\w+)\s*\.\s*(\w+)\s*\(`)
-
-	lineNumber := 0
+	var lines []string
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		lineNumber++
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	// Enhanced pattern matching for @Deprecated annotations
+	deprecatedPattern := regexp.MustCompile(`@[Dd]eprecated\s*\(\s*['"](.+?)['"]`)
+	
+	// More comprehensive patterns for different Dart constructs
+	classPattern := regexp.MustCompile(`(?:abstract\s+)?(?:class|enum|mixin)\s+(\w+)`)
+	methodPattern := regexp.MustCompile(`(?:(?:static|final|const)\s+)*(?:[\w<>?]+\s+)?(\w+)\s*\(`)
+	constructorPattern := regexp.MustCompile(`(\w+)\s*\.\s*(\w+)\s*\(`)
+	propertyPattern := regexp.MustCompile(`(?:(?:static|final|const)\s+)*(?:[\w<>?]+\s+)+(get\s+)?(\w+)(?:\s*[;=]|\s*=>)`)
+	getterPattern := regexp.MustCompile(`(?:[\w<>?]+\s+)?get\s+(\w+)\s*(?:=>|{)`)
+	setterPattern := regexp.MustCompile(`set\s+(\w+)\s*\(`)
+
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
 
 		// Look for @Deprecated annotation
 		if matches := deprecatedPattern.FindStringSubmatch(line); len(matches) > 1 {
-			currentDeprecation = &models.Deprecation{
-				Description: matches[1],
-			}
-			collectingDeprecation = true
-			deprecationMessage.Reset()
-			continue
-		}
-
-		// If we're collecting a deprecation, look for the deprecated item
-		if collectingDeprecation && currentDeprecation != nil {
-			// Skip empty lines and comments
-			if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "/*") {
-				continue
-			}
-
-			// Look for class, method, constructor, or property
+			description := matches[1]
+			
+			// Look ahead for the deprecated item (next few lines)
 			var apiName string
+			var className string
+			
+			// Get current class context by looking backward
+			for j := i - 1; j >= 0 && j >= i-50; j-- {
+				if classMatches := classPattern.FindStringSubmatch(strings.TrimSpace(lines[j])); len(classMatches) > 1 {
+					className = classMatches[1]
+					break
+				}
+			}
+			
+			// Look ahead for the deprecated item
+			for j := i + 1; j < len(lines) && j <= i+10; j++ {
+				nextLine := strings.TrimSpace(lines[j])
+				
+				// Skip empty lines, comments, and annotations
+				if nextLine == "" || strings.HasPrefix(nextLine, "//") || 
+				   strings.HasPrefix(nextLine, "/*") || strings.HasPrefix(nextLine, "@") {
+					continue
+				}
 
-			if matches := classPattern.FindStringSubmatch(line); len(matches) > 1 {
-				apiName = matches[1]
-			} else if matches := constructorPattern.FindStringSubmatch(line); len(matches) > 2 {
-				apiName = matches[1] + "." + matches[2]
-			} else if matches := methodPattern.FindStringSubmatch(line); len(matches) > 1 {
-				apiName = matches[1]
+				// Try to match different constructs
+				if matches := classPattern.FindStringSubmatch(nextLine); len(matches) > 1 {
+					apiName = matches[1]
+					break
+				} else if matches := constructorPattern.FindStringSubmatch(nextLine); len(matches) > 2 {
+					apiName = matches[1] + "." + matches[2]
+					break
+				} else if matches := getterPattern.FindStringSubmatch(nextLine); len(matches) > 1 {
+					if className != "" {
+						apiName = className + "." + matches[1]
+					} else {
+						apiName = matches[1]
+					}
+					break
+				} else if matches := setterPattern.FindStringSubmatch(nextLine); len(matches) > 1 {
+					if className != "" {
+						apiName = className + "." + matches[1]
+					} else {
+						apiName = matches[1]
+					}
+					break
+				} else if matches := methodPattern.FindStringSubmatch(nextLine); len(matches) > 1 {
+					methodName := matches[1]
+					// Filter out common non-method words
+					if methodName != "if" && methodName != "for" && methodName != "while" && 
+					   methodName != "switch" && methodName != "return" && methodName != "throw" {
+						if className != "" && methodName != className {
+							apiName = className + "." + methodName
+						} else {
+							apiName = methodName
+						}
+						break
+					}
+				} else if matches := propertyPattern.FindStringSubmatch(nextLine); len(matches) > 2 {
+					propertyName := matches[2]
+					if className != "" {
+						apiName = className + "." + propertyName
+					} else {
+						apiName = propertyName
+					}
+					break
+				}
 			}
 
 			if apiName != "" {
-				currentDeprecation.API = apiName
-
-				// Try to extract replacement from description
-				desc := currentDeprecation.Description
-				if strings.Contains(strings.ToLower(desc), "use ") {
-					// Extract replacement suggestion
-					usePattern := regexp.MustCompile(`(?i)use\s+([A-Za-z0-9_.]+)`)
-					if useMatches := usePattern.FindStringSubmatch(desc); len(useMatches) > 1 {
-						currentDeprecation.Replacement = useMatches[1]
-					}
+				deprecation := models.Deprecation{
+					API:         apiName,
+					Description: description,
 				}
 
-				deprecations = append(deprecations, *currentDeprecation)
-				currentDeprecation = nil
-				collectingDeprecation = false
+				// Enhanced replacement extraction
+				replacement := f.extractReplacement(description)
+				if replacement != "" {
+					deprecation.Replacement = replacement
+				}
+
+				// Try to infer better replacement based on context
+				if deprecation.Replacement == "" {
+					deprecation.Replacement = f.InferReplacement(apiName, description)
+				}
+
+				deprecations = append(deprecations, deprecation)
 			}
 		}
 	}
 
-	return deprecations, scanner.Err()
+	return deprecations, nil
+}
+
+// extractReplacement tries to extract replacement suggestions from deprecation messages
+func (f *FlutterAPIService) extractReplacement(description string) string {
+	// Pattern 1: "Use X instead"
+	useInsteadPattern := regexp.MustCompile(`(?i)use\s+([A-Za-z0-9_.()]+)(?:\s+instead)?`)
+	if matches := useInsteadPattern.FindStringSubmatch(description); len(matches) > 1 {
+		return matches[1]
+	}
+	
+	// Pattern 2: "Replaced by X"
+	replacedByPattern := regexp.MustCompile(`(?i)replaced\s+by\s+([A-Za-z0-9_.()]+)`)
+	if matches := replacedByPattern.FindStringSubmatch(description); len(matches) > 1 {
+		return matches[1]
+	}
+	
+	// Pattern 3: "Use X() method"
+	useMethodPattern := regexp.MustCompile(`(?i)use\s+(?:the\s+)?([A-Za-z0-9_.()]+)\s+method`)
+	if matches := useMethodPattern.FindStringSubmatch(description); len(matches) > 1 {
+		return matches[1]
+	}
+	
+	// Pattern 4: "Prefer X"
+	preferPattern := regexp.MustCompile(`(?i)prefer\s+([A-Za-z0-9_.()]+)`)
+	if matches := preferPattern.FindStringSubmatch(description); len(matches) > 1 {
+		return matches[1]
+	}
+	
+	return ""
+}
+
+// InferReplacement tries to infer replacement based on common Flutter patterns and contextual analysis (exported for testing)
+func (f *FlutterAPIService) InferReplacement(apiName, description string) string {
+	desc := strings.ToLower(description)
+	api := strings.ToLower(apiName)
+	
+	// Enhanced pattern-based replacements with contextual understanding
+	patterns := map[string]string{
+		// Color patterns
+		"withopacity":        "withValues(alpha: value)",
+		"color.withopacity":  "color.withValues(alpha: value)",
+		
+		// Button patterns  
+		"raisedbutton":       "ElevatedButton",
+		"flatbutton":         "TextButton", 
+		"outlinebutton":      "OutlinedButton",
+		"materialbutton":     "ElevatedButton, TextButton, or OutlinedButton",
+		
+		// Material patterns
+		"floatingactionbutton.mini": "FloatingActionButton(mini: true)",
+		
+		// Navigator patterns
+		"navigator.of(context).push": "Navigator.push(context, route)",
+		"navigator.of(context).pop":  "Navigator.pop(context)",
+		
+		// Scaffold patterns
+		"scaffold.of(context).showsnackbar": "ScaffoldMessenger.of(context).showSnackBar",
+		
+		// Text patterns
+		"text.overflow":      "Text with overflow parameter",
+		"textstyle.height":   "TextStyle.height or TextHeightBehavior",
+		
+		// Widget patterns
+		"wrap.direction":     "Wrap.direction parameter",
+		"flex.direction":     "Flex.direction parameter",
+		
+		// Animation patterns
+		"animationcontroller.reset": "AnimationController.reset() alternative",
+		"tween.animate":             "Tween.animate() or AnimatedBuilder",
+		
+		// Layout patterns
+		"positioned.fill":    "Positioned.fill() constructor",
+		"expanded.flex":      "Expanded(flex: value)",
+		"flexible.flex":      "Flexible(flex: value)",
+	}
+	
+	// Check direct API patterns
+	for pattern, replacement := range patterns {
+		if strings.Contains(api, pattern) {
+			return replacement
+		}
+	}
+	
+	// Analyze description for contextual clues
+	if strings.Contains(desc, "will lead to bugs") || strings.Contains(desc, "causes issues") {
+		if strings.Contains(api, "jump") || strings.Contains(api, "scroll") {
+			return "Use ScrollController methods or ScrollPosition alternatives"
+		}
+		return "Alternative implementation recommended - see Flutter documentation"
+	}
+	
+	if strings.Contains(desc, "performance") {
+		return "More efficient alternative available - check Flutter performance guide"
+	}
+	
+	if strings.Contains(desc, "accessibility") {
+		return "Use semantically improved alternative for better accessibility"
+	}
+	
+	// Method-specific patterns
+	if strings.HasSuffix(api, "withoutsettling") {
+		return "Use standard navigation/animation methods that properly settle"
+	}
+	
+	if strings.Contains(api, "copywidth") || strings.Contains(api, "copyheight") {
+		return "Use copyWith() with specific dimension parameters"
+	}
+	
+	// Generic fallbacks based on API type
+	if strings.Contains(api, "button") {
+		return "Use Material 3 button alternatives (ElevatedButton, TextButton, OutlinedButton)"
+	}
+	
+	if strings.Contains(api, "color") {
+		return "Use updated Color API with values() constructor"
+	}
+	
+	if strings.Contains(api, "theme") {
+		return "Use Material 3 ThemeData with updated color scheme"
+	}
+	
+	return ""
 }
 
 // FetchFlutterSourceDeprecationsWithProgress fetches @Deprecated annotations with progress reporting
@@ -476,7 +649,7 @@ func (f *FlutterAPIService) scanDirectoryForDeprecationsWithProgress(baseURL str
 		}
 
 		fileURL := baseURL + fileName
-		fileDeprecations, err := f.scanFileForDeprecations(fileURL)
+		fileDeprecations, err := f.ScanFileForDeprecations(fileURL)
 		if err != nil {
 			if verbose {
 				log.Printf("Warning: Failed to scan file %s: %v", fileName, err)
