@@ -50,56 +50,76 @@ func (v *VersionInfoService) GetFlutterVersionInfo() (*models.FlutterVersionInfo
 		debugInfo = append(debugInfo, "Flutter CLI not installed, falling back to GitHub API")
 	}
 
-	// If Flutter not installed or failed, fall back to GitHub API
+	// If Flutter not installed or failed, fall back to official releases API, then GitHub API
 	if latestVersion == "" {
-		releases, err := v.apiService.FetchReleases()
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch Flutter releases from GitHub: %v", err)
-		}
-
-		if len(releases) == 0 {
-			return nil, fmt.Errorf("no Flutter releases found")
-		}
-
-		debugInfo = append(debugInfo, "Falling back to GitHub API releases")
-
-		for i, release := range releases {
-			if i < 5 { // Collect debug info for first 5 releases
-				debugInfo = append(debugInfo, fmt.Sprintf("GitHub Release %d: %s (prerelease: %v)", i, release.TagName, release.Prerelease))
+		// Try official releases API first
+		officialReleases, err := v.apiService.FetchOfficialReleases()
+		if err == nil && len(officialReleases.Releases) > 0 {
+			debugInfo = append(debugInfo, "Using official Flutter releases API")
+			
+			// Find latest stable release
+			for _, release := range officialReleases.Releases {
+				if release.Channel == "stable" {
+					latestVersion = release.Version
+					debugInfo = append(debugInfo, fmt.Sprintf("Official API: Found stable version: %s", release.Version))
+					break
+				}
 			}
-
-			tagLower := strings.ToLower(release.TagName)
-			version := v.apiService.ParseVersionFromRelease(release)
-
-			// More strict stable release detection
-			isStable := !release.Prerelease &&
-				!strings.Contains(tagLower, "beta") &&
-				!strings.Contains(tagLower, "dev") &&
-				!strings.Contains(tagLower, "pre") &&
-				!strings.Contains(tagLower, "rc") &&
-				!strings.Contains(tagLower, "alpha") &&
-				!strings.Contains(tagLower, "hotfix") &&
-				!strings.Contains(version, "-") &&
-				// Ensure it's a pure semantic version (no suffixes)
-				regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(version) &&
-				// Additional check: tag should not contain pre-release indicators
-				!strings.Contains(release.TagName, "-") &&
-				!strings.Contains(release.TagName, ".pre") &&
-				!strings.Contains(release.TagName, ".rc") &&
-				!strings.Contains(release.TagName, ".beta") &&
-				!strings.Contains(release.TagName, ".alpha")
-
-			if isStable {
-				latestVersion = version
-				debugInfo = append(debugInfo, fmt.Sprintf("GitHub: Found stable version: %s", version))
-				break
-			}
+		} else {
+			debugInfo = append(debugInfo, fmt.Sprintf("Official API failed: %v, falling back to GitHub API", err))
 		}
 
-		// If no stable found, use the most recent release
+		// If official API failed or no stable found, fall back to GitHub API
 		if latestVersion == "" {
-			latestVersion = v.apiService.ParseVersionFromRelease(releases[0])
-			debugInfo = append(debugInfo, fmt.Sprintf("GitHub: No stable found, using latest: %s", latestVersion))
+			releases, err := v.apiService.FetchReleases()
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch Flutter releases from GitHub: %v", err)
+			}
+
+			if len(releases) == 0 {
+				return nil, fmt.Errorf("no Flutter releases found")
+			}
+
+			debugInfo = append(debugInfo, "Falling back to GitHub API releases")
+
+			for i, release := range releases {
+				if i < 5 { // Collect debug info for first 5 releases
+					debugInfo = append(debugInfo, fmt.Sprintf("GitHub Release %d: %s (prerelease: %v)", i, release.TagName, release.Prerelease))
+				}
+
+				tagLower := strings.ToLower(release.TagName)
+				version := v.apiService.ParseVersionFromRelease(release)
+
+				// More strict stable release detection
+				isStable := !release.Prerelease &&
+					!strings.Contains(tagLower, "beta") &&
+					!strings.Contains(tagLower, "dev") &&
+					!strings.Contains(tagLower, "pre") &&
+					!strings.Contains(tagLower, "rc") &&
+					!strings.Contains(tagLower, "alpha") &&
+					!strings.Contains(tagLower, "hotfix") &&
+					!strings.Contains(version, "-") &&
+					// Ensure it's a pure semantic version (no suffixes)
+					regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(version) &&
+					// Additional check: tag should not contain pre-release indicators
+					!strings.Contains(release.TagName, "-") &&
+					!strings.Contains(release.TagName, ".pre") &&
+					!strings.Contains(release.TagName, ".rc") &&
+					!strings.Contains(release.TagName, ".beta") &&
+					!strings.Contains(release.TagName, ".alpha")
+
+				if isStable {
+					latestVersion = version
+					debugInfo = append(debugInfo, fmt.Sprintf("GitHub: Found stable version: %s", version))
+					break
+				}
+			}
+
+			// If no stable found, use the most recent release
+			if latestVersion == "" {
+				latestVersion = v.apiService.ParseVersionFromRelease(releases[0])
+				debugInfo = append(debugInfo, fmt.Sprintf("GitHub: No stable found, using latest: %s", latestVersion))
+			}
 		}
 	}
 

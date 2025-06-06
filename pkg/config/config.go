@@ -9,6 +9,7 @@ const (
 
 	// API endpoints
 	FLUTTER_API_URL = "https://api.github.com/repos/flutter/flutter/releases"
+	FLUTTER_RELEASES_URL = "https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json"
 
 	// API limits
 	MAX_RELEASES = 100

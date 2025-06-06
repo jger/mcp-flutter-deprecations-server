@@ -73,14 +73,51 @@ func (f *FlutterAPIService) FetchReleases() ([]models.FlutterRelease, error) {
 	return releases, nil
 }
 
+// FetchOfficialReleases fetches Flutter releases from the official Google Storage API
+func (f *FlutterAPIService) FetchOfficialReleases() (*models.FlutterReleasesResponse, error) {
+	resp, err := http.Get(config.FLUTTER_RELEASES_URL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("official Flutter releases API returned status %d", resp.StatusCode)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var releases models.FlutterReleasesResponse
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return nil, err
+	}
+
+	return &releases, nil
+}
+
 // ParseVersionFromRelease extracts version string from release tag
 func (f *FlutterAPIService) ParseVersionFromRelease(release models.FlutterRelease) string {
 	version := strings.TrimPrefix(release.TagName, "v")
 	return version
 }
 
-// GetLatestStableVersion finds the latest stable Flutter version
+// GetLatestStableVersion finds the latest stable Flutter version using official releases API
 func (f *FlutterAPIService) GetLatestStableVersion() (string, error) {
+	// Try official Flutter releases API first (more reliable and faster)
+	officialReleases, err := f.FetchOfficialReleases()
+	if err == nil {
+		// Find the latest stable release
+		for _, release := range officialReleases.Releases {
+			if release.Channel == "stable" {
+				return release.Version, nil
+			}
+		}
+	}
+
+	// Fallback to GitHub API if official API fails
 	releases, err := f.FetchReleases()
 	if err != nil {
 		return "", err

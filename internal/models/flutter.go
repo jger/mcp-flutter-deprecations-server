@@ -11,6 +11,29 @@ type FlutterRelease struct {
 	Prerelease  bool   `json:"prerelease"`
 }
 
+// FlutterOfficialRelease represents a release from the official Flutter releases API
+type FlutterOfficialRelease struct {
+	Hash           string `json:"hash"`
+	Channel        string `json:"channel"`
+	Version        string `json:"version"`
+	DartSDKVersion string `json:"dart_sdk_version"`
+	DartSDKArch    string `json:"dart_sdk_arch"`
+	ReleaseDate    string `json:"release_date"`
+	Archive        string `json:"archive"`
+	SHA256         string `json:"sha256"`
+}
+
+// FlutterReleasesResponse represents the complete response from the official Flutter releases API
+type FlutterReleasesResponse struct {
+	BaseURL        string `json:"base_url"`
+	CurrentRelease struct {
+		Beta   string `json:"beta"`
+		Dev    string `json:"dev"`
+		Stable string `json:"stable"`
+	} `json:"current_release"`
+	Releases []FlutterOfficialRelease `json:"releases"`
+}
+
 // Deprecation represents a deprecated Flutter API
 type Deprecation struct {
 	API         string `json:"api"`

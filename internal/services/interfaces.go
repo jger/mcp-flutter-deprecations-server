@@ -11,6 +11,7 @@ type CacheServiceInterface interface {
 // FlutterAPIServiceInterface defines the Flutter API service contract
 type FlutterAPIServiceInterface interface {
 	FetchReleases() ([]models.FlutterRelease, error)
+	FetchOfficialReleases() (*models.FlutterReleasesResponse, error)
 	ParseVersionFromRelease(release models.FlutterRelease) string
 	GetLatestStableVersion() (string, error)
 	CheckFVMInstalled() bool

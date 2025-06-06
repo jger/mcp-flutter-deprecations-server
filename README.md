@@ -177,9 +177,10 @@ Add to your MCP configuration (e.g., `mcp.json`):
 The server uses a reliable multi-tier approach to detect the latest Flutter version:
 
 1. **Primary**: Flutter CLI (`flutter --version`) - Most accurate, matches developer environment
-2. **Fallback**: GitHub API releases - Used when Flutter CLI not available
-3. **Channel Detection**: Identifies stable/beta/dev channels
-4. **Docker Registry Support**: Checks both Docker Hub and GitHub Container Registry
+2. **Official API**: Google Storage Flutter releases API (`https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`) - Faster and more reliable than GitHub
+3. **Fallback**: GitHub API releases - Used when both Flutter CLI and official API are unavailable
+4. **Channel Detection**: Identifies stable/beta/dev channels from official sources
+5. **Docker Registry Support**: Checks both Docker Hub and GitHub Container Registry
 
 ## Cache Location
 

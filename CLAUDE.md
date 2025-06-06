@@ -75,7 +75,7 @@ make build-all     # Cross-compile for multiple platforms (linux, darwin, window
 
 **Rate Limiting:** GitHub API calls include exponential backoff and graceful degradation when rate limits are hit.
 
-**Multi-Platform Version Detection:** Checks Flutter CLI, FVM, and Docker image availability across multiple registries (Docker Hub, GitHub Container Registry).
+**Multi-Platform Version Detection:** Uses official Flutter releases API (Google Storage) as primary source, with Flutter CLI detection and GitHub API fallback. Checks FVM and Docker image availability across multiple registries.
 
 **Caching Strategy:** 24-hour local cache with manual update/clear commands. Cache automatically refreshes on first tool use if stale.
 
